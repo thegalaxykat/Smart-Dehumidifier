@@ -10,12 +10,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <Wire.h>
-
-#ifndef STASSID
-#define STASSID "your-ssid-here"
-#define STAPSK "password-here"
-#define RELAYIP "shelly-relay-ip-here"
-#endif
+#include "credentials.h" // don't forget to fill out this file with wifi creds
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 WiFiClient client;
