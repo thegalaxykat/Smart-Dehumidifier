@@ -1,13 +1,15 @@
-/*************************************************** 
-  Using SHT31-D Humidity & Temp Sensor
-  Making requests to Shelly Smart Plug
- ****************************************************/
- 
-#include <Arduino.h>
-#include <Wire.h>
+/***************************************************
+  Smart Dehumidifier Control System
+  - Uses SHT31-D Humidity & Temperature Sensor
+  - Controls dehumidifier via Shelly Smart Plug
+  - Monitors humidity and activates/deactivates accordingly
+****************************************************/
+
 #include "Adafruit_SHT31.h"
-#include <ESP8266WiFi.h>
+#include <Arduino.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <Wire.h>
 
 #ifndef STASSID
 #define STASSID "your-ssid-here"
@@ -18,29 +20,39 @@
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 WiFiClient client;
 
-const int ledPin = 2;
+// Optional hardware pin
+const int LED_PIN = 2;
+
+// Timing variables
 unsigned long lastHeaterRun = 0;
 unsigned long lastRequestTime = 0;
-const unsigned long cooldown = 30000; // 30 second cooldown
-float highThreshold = 60; // relative humidity to turn on
-float lowThreshold = 50;
+
+// Config constants
+const unsigned long MEASUREMENT_INTERVAL = 30000; // 30 seconds
+const float HIGH_HUMIDITY_THRESHOLD = 60;         // relative humidity to turn on
+const float LOW_HUMIDITY_THRESHOLD = 50;
+const float CRITICAL_HUMIDITY_THRESHOLD = 95.0;    // % RH to turn on sensor heater
+const unsigned long SENSOR_HEAT_INTERVAL = 300000; // 5 minutes
+const unsigned long SENSOR_HEAT_DURATION = 2000;   // 2 seconds
+
 
 void setup() {
   Serial.begin(9600);
-  
+
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(ledPin, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
 
   digitalWrite(LED_BUILTIN, LOW);
-  digitalWrite(ledPin, LOW);
+  digitalWrite(LED_PIN, LOW);
 
   while (!Serial)
     delay(10); // pause until serial console opens
 
-  Serial.println("SHT31 test");
-  if (! sht31.begin(0x44)) {
+  Serial.println("Initializing Sensor");
+  if (!sht31.begin(0x44)) {
     Serial.println("Couldn't find SHT31");
-    while (1) delay(1);
+    while (1)
+      delay(1);
   }
 
   Serial.println("Connecting to Network");
@@ -56,38 +68,37 @@ void setup() {
   Serial.println(WiFi.localIP());
 }
 
-
 void loop() {
   float humidity = sht31.readHumidity();
   unsigned long now = millis();
 
-  if (now - lastRequestTime > cooldown && !isnan(humidity)) {
+  if (now - lastRequestTime > MEASUREMENT_INTERVAL && !isnan(humidity)) {
     Serial.println("Relative Humidity: " + String(humidity) + "%");
-    if (humidity > highThreshold) {
-      digitalWrite(ledPin, HIGH);
-      HumidifierRun(true);
+    if (humidity > HIGH_HUMIDITY_THRESHOLD) {
+      digitalWrite(LED_PIN, HIGH);
+      dehumidifierRun(true);
       lastRequestTime = now;
-    } else if (humidity < lowThreshold) {
-      digitalWrite(ledPin, LOW);
-      HumidifierRun(false);
+    } else if (humidity < LOW_HUMIDITY_THRESHOLD) {
+      digitalWrite(LED_PIN, LOW);
+      dehumidifierRun(false);
       lastRequestTime = now;
     }
-  } else if (isnan(humidity)) { 
+  } else if (isnan(humidity)) {
     Serial.println("Failed to read humidity");
   }
 
-  // In high humidity trigger sensor heater for 2 seconds every 5 minutes
-  if (!isnan(humidity) && humidity > 95 && (now - lastHeaterRun >= 300000UL)) {
+  // Activate sensor heater in high humidity to avoid condensation
+  if (!isnan(humidity) && humidity > CRITICAL_HUMIDITY_THRESHOLD &&
+      (now - lastHeaterRun >= SENSOR_HEAT_INTERVAL)) {
     sht31.heater(true);
-    delay(2000);
+    delay(SENSOR_HEAT_DURATION);
     sht31.heater(false);
     delay(1000); // pause for heater to cool
     lastHeaterRun = now;
   }
 }
 
-
-void HumidifierRun(bool state) {
+void dehumidifierRun(bool state) {
   if (WiFi.status() == WL_CONNECTED) {
     String action = state ? "on" : "off";
     String url = String("http://") + RELAYIP + "/relay/0?turn=" + action;
@@ -102,7 +113,8 @@ void HumidifierRun(bool state) {
       Serial.printf("HTTP GET code: %d\n", httpCode);
       Serial.println(http.getString());
     } else {
-      Serial.printf("Request failed: %s\n", http.errorToString(httpCode).c_str());
+      Serial.printf("Request failed: %s\n",
+                    http.errorToString(httpCode).c_str());
     }
 
     http.end();
