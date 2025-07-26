@@ -10,7 +10,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <Wire.h>
-#include "credentials.h" // don't forget to fill out this file with wifi creds
+#include "credentials.h" // don't forget to copy the template as 'credentials.h' with your network info
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 WiFiClient client;
@@ -24,8 +24,8 @@ unsigned long lastRequestTime = 0;
 
 // Config constants
 const unsigned long MEASUREMENT_INTERVAL = 30000; // 30 seconds
-const float HIGH_HUMIDITY_THRESHOLD = 60;         // relative humidity to turn on
-const float LOW_HUMIDITY_THRESHOLD = 50;
+const float HIGH_HUMIDITY_THRESHOLD = 50;         // relative humidity to turn on
+const float LOW_HUMIDITY_THRESHOLD = 45;
 const float CRITICAL_HUMIDITY_THRESHOLD = 95.0;    // % RH to turn on sensor heater
 const unsigned long SENSOR_HEAT_INTERVAL = 300000; // 5 minutes
 const unsigned long SENSOR_HEAT_DURATION = 2000;   // 2 seconds
